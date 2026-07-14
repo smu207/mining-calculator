@@ -1426,7 +1426,7 @@ scanApplyBtn.addEventListener('click', () => {
     m.expiry = r.cooldown > 0 ? now() + r.cooldown*1000 : 0;
   }
   save(); runRoute();
-  scanDialog.close();
+  // scanDialog.close();
   toast(`스캔 적용: 신규 ${added}개, 갱신 ${updated}개`);
 });
 
