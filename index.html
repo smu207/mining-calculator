@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>광산 쿨타임 관리</title>
+<title>광산/채집장 쿨타임 관리</title>
 <style>
 @font-face {
   font-family: 'DungGeunMo';
@@ -22,6 +22,7 @@
   --gold: #ffc94d;
   --diamond: #58c4dd;
   --lapis: #6a8cff;
+  --amethyst: #b388ff;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -86,7 +87,7 @@ main {
   color: var(--muted); font-size: 12px;
 }
 .map-toolbar label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text); }
-.map-toolbar input[type=checkbox] { accent-color: var(--gold); }
+.map-toolbar input[type=checkbox], .map-toolbar input[type=radio] { accent-color: var(--gold); }
 .map-toolbar .zoomctl { margin-left: auto; display: flex; gap: 6px; align-items: center; }
 
 #mapWrap { padding: 10px; }
@@ -107,6 +108,7 @@ main {
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .dot { width: 10px; height: 10px; display: inline-block; }
 .dot.mine { background: var(--redstone); }
+.dot.gather { background: var(--amethyst); border-radius: 2px; }
 .dot.ready { background: var(--emerald); }
 .dot.portal { background: var(--lapis); border-radius: 50%; }
 .dot.route { width: 18px; height: 3px; background: var(--gold); }
@@ -203,10 +205,7 @@ textarea { resize: vertical; min-height: 110px; font-family: monospace !importan
 }
 .toast.show { opacity: 1; }
 
-.drop-zone {
-  border: 2px dashed var(--border); padding: 24px 14px; text-align: center;
-  color: var(--muted); cursor: pointer; margin-top: 6px; transition: border-color .15s;
-}
+.drop-zone { border: 2px dashed var(--border); padding: 24px 14px; text-align: center; color: var(--muted); cursor: pointer; margin-top: 6px; transition: border-color .15s; }
 .drop-zone:hover, .drop-zone.over { border-color: var(--gold); color: var(--text); }
 .drop-zone img { max-width: 100%; max-height: 220px; display: block; margin: 0 auto; }
 .drop-zone video { display: block; width: 100%; max-height: 220px; object-fit: contain; background: #000; }
@@ -220,10 +219,7 @@ textarea { resize: vertical; min-height: 110px; font-family: monospace !importan
 .scan-result table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .scan-result th, .scan-result td { padding: 5px 8px; text-align: left; border-bottom: 1px solid var(--panel-2); }
 .scan-result th { color: var(--muted); font-weight: normal; font-size: 12px; position: sticky; top: 0; background: var(--panel); }
-.scan-result input.cell {
-  width: 100%; min-width: 52px; background: var(--panel-2); border: 1px solid var(--border);
-  color: var(--text); padding: 3px 5px; font-size: 13px;
-}
+.scan-result input.cell { width: 100%; min-width: 52px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 3px 5px; font-size: 13px; }
 .scan-result input.cell:focus { outline: none; border-color: var(--diamond); }
 .scan-result .new-tag { color: var(--emerald); font-size: 11px; }
 .scan-result .upd-tag { color: var(--gold); font-size: 11px; }
@@ -238,7 +234,7 @@ svg text { user-select: none; pointer-events: none; }
 <body>
 
 <header>
-  <h1>⛏ 광산 쿨타임 관리</h1>
+  <h1>⛏ 광산/채집장 관리</h1>
   <span class="sub">이동 속도 15블록/초</span>
   <span class="spacer"></span>
   <button class="btn small primary" id="btnScan">📷 화면 스캔</button>
@@ -250,11 +246,19 @@ svg text { user-select: none; pointer-events: none; }
 <main>
   <section class="map-panel">
     <div class="panel-title">지도 <span class="hint">마커를 클릭하면 수정 · 드래그로 이동 · 휠로 확대</span></div>
+    
+    <div class="map-toolbar" style="background:var(--panel-2); padding: 6px 14px; gap: 18px; border-bottom: 1px solid var(--border);">
+      <strong style="color:var(--text); font-size:12px;">보기 대상:</strong>
+      <label><input type="radio" name="targetMode" value="mines"> 광산만</label>
+      <label><input type="radio" name="targetMode" value="gathers"> 채집장만</label>
+      <label><input type="radio" name="targetMode" value="all" checked> 모두 보기</label>
+    </div>
+
     <div class="map-toolbar">
       <label><input type="checkbox" id="optLabels" checked> 이름 표시</label>
       <label><input type="checkbox" id="optTimes" checked> 쿨타임 표시</label>
-      <label><input type="checkbox" id="optRouteLabels" checked> 경로 라벨</label>
-      <label><input type="checkbox" id="optOnlyReady"> 준비된 광산만</label>
+      <label><input type="checkbox" id="optRouteLabels"> 경로 라벨</label>
+      <label><input type="checkbox" id="optOnlyReady"> 준비됨만 보기</label>
       <span class="zoomctl">
         <button class="btn small" id="btnZoomOut">−</button>
         <span id="zoomLevel" style="min-width:44px;text-align:center;font-family:monospace">100%</span>
@@ -264,39 +268,57 @@ svg text { user-select: none; pointer-events: none; }
     </div>
     <div id="mapWrap"><svg id="mapSvg" viewBox="0 0 900 760" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="광산과 포탈 지도"></svg></div>
     <div class="legend">
-      <span><i class="dot mine"></i> 쿨타임 중</span>
-      <span><i class="dot ready"></i> 채굴 가능</span>
+      <span><i class="dot mine"></i> 광산 쿨</span>
+      <span><i class="dot gather"></i> 채집장 쿨</span>
+      <span><i class="dot ready"></i> 채굴/채집 가능</span>
       <span><i class="dot portal"></i> 포탈</span>
-      <span><i class="dot route"></i> 출발 포탈 → 광산</span>
+      <span><i class="dot route"></i> 이동 경로</span>
     </div>
   </section>
 
   <aside class="side-panel">
     <div class="tabs">
       <button class="tab active" data-tab="mines">⛏ 광산 <span class="count" id="mineCount">0</span></button>
+      <button class="tab" data-tab="gathers">🌿 채집장 <span class="count" id="gatherCount">0</span></button>
       <button class="tab" data-tab="portals">🌀 포탈 <span class="count" id="portalCount">0</span></button>
     </div>
 
-    <!-- 광산 탭 -->
     <div class="tab-body active" id="tab-mines">
       <div class="searchbar">
         <input id="mineSearch" placeholder="광산 이름·좌표 검색" autocomplete="off">
-        <button class="btn small" id="btnSortMine" title="정렬 전환">쿨타임순</button>
+        <button class="btn small btnSortList" data-target="mines" title="정렬 전환">쿨타임순</button>
       </div>
       <div class="rows" id="mineList"></div>
-      <div class="route-summary" id="routeSummary"></div>
+      <div class="route-summary" id="mineRouteSummary"></div>
       <div class="side-actions">
-        <select id="routeMode" class="btn">
-          <option value="simple" selected>방식 2: 남은 시간 적은 순 (가까운 출발 포탈 안내)</option>
-          <option value="optimal">방식 1: 대기시간 최소화 (연속 콤보 동선)</option>
+        <select class="btn routeMode">
+          <option value="simple" selected>방식 2: 남은 시간 적은 순</option>
+          <option value="optimal">방식 1: 대기시간 최소화 콤보</option>
         </select>
-        <button class="btn primary" id="btnRoute" style="flex:1">경로 갱신</button>
+        <button class="btn primary btnRoute" style="flex:1">경로 갱신</button>
         <button class="btn" id="btnAddMine">+ 광산</button>
-        <button class="btn danger" id="btnClearCd">쿨타임 전체 해제</button>
+        <button class="btn danger btnClearCd" data-target="mines">쿨타임 해제</button>
       </div>
     </div>
 
-    <!-- 포탈 탭 -->
+    <div class="tab-body" id="tab-gathers">
+      <div class="searchbar">
+        <input id="gatherSearch" placeholder="채집장 이름·좌표 검색" autocomplete="off">
+        <button class="btn small btnSortList" data-target="gathers" title="정렬 전환">쿨타임순</button>
+      </div>
+      <div class="rows" id="gatherList"></div>
+      <div class="route-summary" id="gatherRouteSummary"></div>
+      <div class="side-actions">
+        <select class="btn routeMode">
+          <option value="simple" selected>방식 2: 남은 시간 적은 순</option>
+          <option value="optimal">방식 1: 대기시간 최소화 콤보</option>
+        </select>
+        <button class="btn primary btnRoute" style="flex:1">경로 갱신</button>
+        <button class="btn" id="btnAddGather">+ 채집장</button>
+        <button class="btn danger btnClearCd" data-target="gathers">쿨타임 해제</button>
+      </div>
+    </div>
+
     <div class="tab-body" id="tab-portals">
       <div class="searchbar">
         <input id="portalSearch" placeholder="포탈 이름·좌표 검색" autocomplete="off">
@@ -310,7 +332,6 @@ svg text { user-select: none; pointer-events: none; }
   </aside>
 </main>
 
-<!-- 쿨타임 다이얼로그 -->
 <dialog id="cdDialog">
   <h2 id="cdTitle">쿨타임 수정</h2>
   <label for="cdInput">쿨타임 (예: 5 30, 5:30, 5분 30초, 5)</label>
@@ -323,9 +344,8 @@ svg text { user-select: none; pointer-events: none; }
   </div>
 </dialog>
 
-<!-- 추가/편집 다이얼로그 (광산·포탈 공용) -->
 <dialog id="editDialog">
-  <h2 id="editTitle">광산 추가</h2>
+  <h2 id="editTitle">추가</h2>
   <label for="editName">이름</label>
   <input id="editName" autocomplete="off">
   <div class="row">
@@ -342,8 +362,8 @@ svg text { user-select: none; pointer-events: none; }
 
 <dialog id="csvDialog">
   <h2>CSV 불러오기</h2>
-  <label>형식: <code>type,name,x,z</code> (type은 mine 또는 portal)<br>헤더 없이 <code>name,x,z</code>만 있으면 광산으로 처리됩니다.</label>
-  <textarea id="csvText" placeholder="mine,다이아 광산,120,-340&#10;portal,중앙 포탈,0,0"></textarea>
+  <label>형식: <code>type,name,x,z</code> (type은 mine, gather 또는 portal)<br>헤더 없이 <code>name,x,z</code>만 있으면 광산으로 처리됩니다.</label>
+  <textarea id="csvText" placeholder="mine,다이아 광산,120,-340&#10;gather,약초 채집장,10,20&#10;portal,중앙 포탈,0,0"></textarea>
   <label style="margin-top:10px">또는 파일 선택 <input type="file" id="csvFile" accept=".csv,.txt" style="border:none;padding:4px 0"></label>
   <div class="error" id="csvError"></div>
   <div class="actions">
@@ -393,10 +413,11 @@ const SPEED = 15;
 const STORE_KEY = 'minemap:data';
 const $ = id => document.getElementById(id);
 
-let mines = [], portals = [], route = [], nextId = 1;
+let mines = [], gathers = [], portals = [], route = [], nextId = 1;
 let selectedId = null;
-let mineSort = 'cd'; // cd | name
+let sortModes = { mines: 'cd', gathers: 'cd' }; 
 let view = { scale: 1, tx: 0, ty: 0 };
+let currentTargetMode = 'all'; 
 const VW = 900, VH = 760;
 
 const now = () => Date.now();
@@ -426,11 +447,11 @@ async function storageGet(k) {
   if (INSIDE_CLAUDE) { const r = await window.storage.get(k); return r ? r.value : null; }
   return localStorage.getItem(k);
 }
-async function save() { try { await storageSet(STORE_KEY, JSON.stringify({ mines, portals, nextId })); } catch (e) {} }
+async function save() { try { await storageSet(STORE_KEY, JSON.stringify({ mines, gathers, portals, nextId })); } catch (e) {} }
 async function load() {
   try {
     const v = await storageGet(STORE_KEY);
-    if (v) { const d = JSON.parse(v); mines = d.mines || []; portals = d.portals || []; nextId = d.nextId || 1; return true; }
+    if (v) { const d = JSON.parse(v); mines = d.mines || []; gathers = d.gathers || []; portals = d.portals || []; nextId = d.nextId || 1; return true; }
   } catch (e) {}
   return false;
 }
@@ -440,64 +461,86 @@ let apiKey = '';
 async function loadApiKey() { try { apiKey = (await storageGet(APIKEY_KEY)) || ''; } catch (e) { apiKey = ''; } }
 async function saveApiKey(k) { apiKey = (k||'').trim(); try { await storageSet(APIKEY_KEY, apiKey); } catch (e) {} }
 
+// 제공된 CSV 데이터를 기반으로 샘플 데이터를 로드합니다
 function loadSample() {
-  const P = (name, x, z) => ({ id: nextId++, name, x, z });
+  const P = (name, x, z) => ({ id: nextId++, name, x, z, type: 'portal' });
   portals = [
-    P('중앙 포탈', -962, -814), P('1번 전초', -1906, -3710),
-    P('2번 전초', -4330, 1535), P('3번 전초', 1689, -2431)
+    P('중앙 포탈', -962, -814),
+    P('1번 전초', -1906, -3710),
+    P('2번 전초', 1689, -2431),
+    P('3번 전초', -4410, 1509)
   ];
-  const M = (n,x,z) => ({ ...P(n,x,z), expiry: 0 });
+  
+  const M = (name, x, z) => ({ id: nextId++, name, x, z, type: 'mine', expiry: 0 });
   mines = [
-    M('1번 채굴장',-1094,-701), M('2번 채굴장',-1038,-15), M('3번 채굴장',-1837,-943),
-    M('4번 채굴장',-1732,-340), M('5번 채굴장',-1121,376), M('12번 채굴장',-2164,-3085),
-    M('13번 채굴장',-2035,-3664), M('21번 채굴장',-3960,1241), M('23번 채굴장',-1859,1193),
-    M('25번 채굴장',-3382,1681), M('26번 채굴장',-3488,2353), M('27번 채굴장',-3941,1948),
-    M('28번 채굴장',-4421,1001), M('29번 채굴장',-3849,466), M('30번 채굴장',-2535,-679),
-    M('37번 채굴장',-2406,-3560)
+    M('1번 채굴장', -1094, -701), M('2번 채굴장', -1038, -15), M('3번 채굴장', -1837, -943),
+    M('4번 채굴장', -1732, -340), M('5번 채굴장', -1121, 376), M('6번 채굴장', -1766, 809),
+    M('7번 채굴장', -2445, 600), M('9번 채굴장', -2013, 135), M('10번 채굴장', -2081, -1651),
+    M('11번 채굴장', -2722, -2389), M('12번 채굴장', -2164, -3085), M('13번 채굴장', -2035, -3664),
+    M('17번 채굴장', -4033, -1055), M('18번 채굴장', -3225, -718), M('21번 채굴장', -3960, 1241),
+    M('22번 채굴장', -2899, 1114), M('23번 채굴장', -1859, 1193), M('25번 채굴장', -3382, 1681),
+    M('26번 채굴장', -3488, 2353), M('27번 채굴장', -3941, 1948), M('28번 채굴장', -4421, 1001),
+    M('30번 채굴장', -2535, -679), M('32번 채굴장', -2671, -1892), M('33번 채굴장', -1340, -1451),
+    M('36번 채굴장', -4458, -2309), M('37번 채굴장', -2406, -3560), M('39번 채굴장', -2304, -4282)
   ];
+  
+  gathers = []; // 현재 CSV에 채집장 데이터가 없으므로 빈 배열로 초기화합니다
+}
+
+// ---------- 대상 필터링 ----------
+function getActiveTargets() {
+  let targets = [];
+  if (currentTargetMode === 'mines') targets = [...mines];
+  else if (currentTargetMode === 'gathers') targets = [...gathers];
+  else targets = [...mines, ...gathers]; 
+  return targets;
 }
 
 // ---------- 경로 ----------
-function nearestPortal(mine) {
+function nearestPortal(target) {
   let best = null, minT = Infinity;
-  for (const p of portals) { const t = dist(p, mine) / SPEED; if (t < minT) { minT = t; best = p; } }
+  for (const p of portals) { const t = dist(p, target) / SPEED; if (t < minT) { minT = t; best = p; } }
   return best ? { portal: best, travel: minT } : null;
 }
 function findOptimalRoute() {
-  const mode = $('routeMode') ? $('routeMode').value : 'simple';
-  const cdMap = new Map(mines.map(m => [m.id, remainSec(m)]));
+  const activeTab = document.querySelector('.tab-body.active');
+  const modeSelect = activeTab ? activeTab.querySelector('.routeMode') : null;
+  const mode = modeSelect ? modeSelect.value : 'simple';
+  
+  const targets = getActiveTargets();
+  const cdMap = new Map(targets.map(m => [m.id, remainSec(m)]));
   const result = [];
-  if (!portals.length || !mines.length) return result;
+  if (!portals.length || !targets.length) return result;
 
   if (mode === 'simple') {
-    const sorted = [...mines].sort((a,b) => {
+    const sorted = [...targets].sort((a,b) => {
       const d = cdMap.get(a.id) - cdMap.get(b.id);
       return d !== 0 ? d : a.name.localeCompare(b.name);
     });
     let order = 1;
-    for (const mine of sorted) {
-      const np = nearestPortal(mine);
-      if (np) result.push({ portalId: np.portal.id, mineId: mine.id, order: order++, travel: np.travel });
+    for (const target of sorted) {
+      const np = nearestPortal(target);
+      if (np) result.push({ portalId: np.portal.id, targetId: target.id, order: order++, travel: np.travel });
     }
     return result;
   }
 
   let t = 0;
   const visited = new Set();
-  while (visited.size < mines.length) {
+  while (visited.size < targets.length) {
     const cands = [];
-    for (const mine of mines) {
-      if (visited.has(mine.id)) continue;
-      const np = nearestPortal(mine);
+    for (const target of targets) {
+      if (visited.has(target.id)) continue;
+      const np = nearestPortal(target);
       if (!np) continue;
-      const wait = Math.max(0, cdMap.get(mine.id) - (t + np.travel));
-      cands.push({ mine, portal: np.portal, travel: np.travel, wait });
+      const wait = Math.max(0, cdMap.get(target.id) - (t + np.travel));
+      cands.push({ target, portal: np.portal, travel: np.travel, wait });
     }
     if (!cands.length) break;
     cands.sort((a,b) => a.wait !== b.wait ? a.wait - b.wait : a.travel - b.travel);
     const best = cands[0];
-    visited.add(best.mine.id);
-    result.push({ portalId: best.portal.id, mineId: best.mine.id, order: result.length + 1, travel: best.travel });
+    visited.add(best.target.id);
+    result.push({ portalId: best.portal.id, targetId: best.target.id, order: result.length + 1, travel: best.travel });
     t += best.travel + best.wait;
   }
   return result;
@@ -507,13 +550,13 @@ function runRoute() { route = findOptimalRoute(); render(); }
 // ---------- 좌표 변환 ----------
 const PAD = 70;
 function baseProjector() {
-  const all = [...mines, ...portals];
+  const all = [...mines, ...gathers, ...portals];
   if (!all.length) return () => [VW/2, VH/2];
   const xs = all.map(l => l.x), zs = all.map(l => l.z);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minZ = Math.min(...zs), maxZ = Math.max(...zs);
   const spanX = Math.max(1, maxX - minX), spanZ = Math.max(1, maxZ - minZ);
-  const s = Math.min((VW - PAD*2) / spanX, (VH - PAD*2) / spanZ); // 종횡비 유지
+  const s = Math.min((VW - PAD*2) / spanX, (VH - PAD*2) / spanZ);
   const ox = (VW - spanX * s) / 2, oy = (VH - spanZ * s) / 2;
   return loc => [(loc.x - minX) * s + ox, (loc.z - minZ) * s + oy];
 }
@@ -524,7 +567,6 @@ function projector() {
 
 // ---------- 라벨 충돌 회피 ----------
 function placeLabels(items) {
-  // items: {x, y, w, h, ...}  y는 기본 위치. 겹치면 아래위로 밀어냄.
   const placed = [];
   const overlap = (a, b) =>
     a.x - a.w/2 < b.x + b.w/2 && a.x + a.w/2 > b.x - b.w/2 &&
@@ -555,12 +597,13 @@ const opt = id => $(id).checked;
 function drawMap() {
   svg.innerHTML = '';
   const toXY = projector();
-  const byId = new Map([...mines, ...portals].map(l => [l.id, l]));
+  const byId = new Map([...mines, ...gathers, ...portals].map(l => [l.id, l]));
   const onlyReady = opt('optOnlyReady');
-  const visMines = onlyReady ? mines.filter(m => remainSec(m) === 0) : mines;
-  const visIds = new Set(visMines.map(m => m.id));
+  
+  const activeTargets = getActiveTargets();
+  const visTargets = onlyReady ? activeTargets.filter(m => remainSec(m) === 0) : activeTargets;
+  const visIds = new Set(visTargets.map(m => m.id));
 
-  // 클리핑
   const defs = el('defs');
   const clip = el('clipPath', { id: 'mapClip' });
   clip.appendChild(el('rect', { x: 0, y: 0, width: VW, height: VH }));
@@ -569,43 +612,41 @@ function drawMap() {
   const g = el('g', { 'clip-path': 'url(#mapClip)' });
   svg.appendChild(g);
 
-  // 경로 선 (마커 아래)
   const routeLabels = [];
   for (const s of route) {
-    const p = byId.get(s.portalId), m = byId.get(s.mineId);
+    const p = byId.get(s.portalId), m = byId.get(s.targetId);
     if (!p || !m || !visIds.has(m.id)) continue;
     const [x1,y1] = toXY(p), [x2,y2] = toXY(m);
-    g.appendChild(el('line', { x1, y1, x2, y2, stroke: '#ffc94d', 'stroke-width': 2, 'stroke-dasharray': '7 5', opacity: .55 }));
+    g.appendChild(el('line', { x1, y1, x2, y2, stroke: '#ffc94d', 'stroke-width': 3.5, 'stroke-dasharray': '8 5', opacity: .9 }));
     if (opt('optRouteLabels')) {
       const r = remainSec(m);
       const txt = r > 0 ? `쿨 ${fmtClock(r)} · 이동 ${fmtClock(s.travel)}` : `이동 ${fmtClock(s.travel)}`;
-      routeLabels.push({ x: (x1+x2)/2, y: (y1+y2)/2, w: txt.length * 6.2 + 8, h: 14, text: txt });
+      routeLabels.push({ x: (x1+x2)/2, y: (y1+y2)/2, w: txt.length * 5.8 + 8, h: 14, text: txt });
     }
   }
+
   for (const l of placeLabels(routeLabels)) {
     if (l.hidden) continue;
-    g.appendChild(el('rect', { x: l.x - l.w/2, y: l.y - 11, width: l.w, height: 15, fill: '#14161a', opacity: .8, rx: 2 }));
+    g.appendChild(el('rect', { x: l.x - l.w/2, y: l.y - 11, width: l.w, height: 15, fill: '#14161a', opacity: .7, rx: 2 }));
     g.appendChild(el('text', { x: l.x, y: l.y, fill: '#ffc94d', 'font-size': 11, 'text-anchor': 'middle' }, l.text));
   }
 
-  // 라벨 후보 수집 (마커보다 먼저 계산해서 겹침 방지)
   const labels = [];
   const showName = opt('optLabels'), showTime = opt('optTimes');
 
   for (const p of portals) {
     const [x, y] = toXY(p);
-    if (showName) labels.push({ x, y: y - 15, w: p.name.length * 8.4 + 12, h: 17, text: p.name, kind: 'portal', id: p.id });
+    if (showName) labels.push({ x, y: y - 15, w: p.name.length * 8.0 + 10, h: 17, text: p.name, kind: 'portal', id: p.id });
   }
-  for (const m of visMines) {
+  for (const m of visTargets) {
     const [x, y] = toXY(m);
     const r = remainSec(m);
     let txt = '';
     if (showName) txt = m.name;
     if (showTime) txt += (txt ? ' · ' : '') + (r > 0 ? fmtClock(r) : '준비');
-    if (txt) labels.push({ x, y: y - 15, w: txt.length * 7.6 + 12, h: 17, text: txt, kind: 'mine', ready: r === 0, id: m.id });
+    if (txt) labels.push({ x, y: y - 15, w: txt.length * 7.0 + 8, h: 17, text: txt, kind: m.type, ready: r === 0, id: m.id });
   }
 
-  // 포탈 마커
   for (const p of portals) {
     const [x, y] = toXY(p);
     const gm = el('g', { class: 'marker' + (selectedId === p.id ? ' sel' : '') });
@@ -615,33 +656,45 @@ function drawMap() {
     g.appendChild(gm);
   }
 
-  // 광산 마커
-  const orderByMine = new Map(route.map(s => [s.mineId, s.order]));
-  for (const m of visMines) {
+  const orderByTarget = new Map(route.map(s => [s.targetId, s.order]));
+  for (const m of visTargets) {
     const [x, y] = toXY(m);
     const r = remainSec(m);
     const gm = el('g', { class: 'marker' + (selectedId === m.id ? ' sel' : '') });
-    gm.appendChild(el('rect', { x: x-9, y: y-9, width: 18, height: 18, fill: r > 0 ? '#ff5544' : '#3ddc84', class: 'block', stroke: '#14161a', 'stroke-width': 2 }));
-    gm.appendChild(el('rect', { x: x-4, y: y-4, width: 8, height: 8, fill: '#14161a', opacity: .5 }));
+    
+    let baseColor = '#3ddc84'; 
+    if (r > 0) {
+      baseColor = m.type === 'mine' ? '#ff5544' : '#b388ff';
+    }
+
+    gm.appendChild(el('rect', { x: x-9, y: y-9, width: 18, height: 18, rx: m.type === 'gather'? 3 : 0, fill: baseColor, class: 'block', stroke: '#14161a', 'stroke-width': 2 }));
+    gm.appendChild(el('rect', { x: x-4, y: y-4, width: 8, height: 8, rx: m.type === 'gather'? 2 : 0, fill: '#14161a', opacity: .5 }));
     gm.addEventListener('click', e => { e.stopPropagation(); selectedId = m.id; openCooldownDialog(m.id); });
     g.appendChild(gm);
 
-    const order = orderByMine.get(m.id);
+    const order = orderByTarget.get(m.id);
     if (order) {
       g.appendChild(el('circle', { cx: x + 13, cy: y + 13, r: 9, fill: '#14161a', stroke: '#ffc94d', 'stroke-width': 1.5 }));
       g.appendChild(el('text', { x: x + 13, y: y + 17, fill: '#ffc94d', 'font-size': 11, 'text-anchor': 'middle' }, order));
     }
   }
 
-  // 라벨 (마커 위, 충돌 회피 + 배경 박스)
   for (const l of placeLabels(labels)) {
     if (l.hidden) continue;
     const sel = selectedId === l.id;
-    const fill = l.kind === 'portal' ? '#a9bcff' : (l.ready ? '#8ff0bb' : '#ffd9d3');
+    let fill = l.ready ? '#8ff0bb' : '#ffd9d3';
+    if (l.kind === 'portal') fill = '#a9bcff';
+    else if (l.kind === 'gather' && !l.ready) fill = '#d8bffd';
+
+    let strokeColor = l.ready ? '#3ddc84' : '#5c3a38';
+    if (l.kind === 'portal') strokeColor = '#6a8cff';
+    else if (l.kind === 'gather' && !l.ready) strokeColor = '#6d459b';
+    if (sel) strokeColor = '#58c4dd';
+
     g.appendChild(el('rect', {
       x: l.x - l.w/2, y: l.y - 13, width: l.w, height: 18, rx: 3,
-      fill: '#101216', opacity: .92,
-      stroke: sel ? '#58c4dd' : (l.kind === 'portal' ? '#6a8cff' : (l.ready ? '#3ddc84' : '#5c3a38')),
+      fill: '#101216', opacity: .45, 
+      stroke: strokeColor,
       'stroke-width': sel ? 2 : 1
     }));
     g.appendChild(el('text', { x: l.x, y: l.y, fill, 'font-size': 12, 'text-anchor': 'middle' }, l.text));
@@ -650,7 +703,13 @@ function drawMap() {
   $('zoomLevel').textContent = Math.round(view.scale * 100) + '%';
 }
 
-// 지도 팬/줌
+document.querySelectorAll('input[name="targetMode"]').forEach(r => {
+  r.addEventListener('change', e => {
+    currentTargetMode = e.target.value;
+    runRoute(); 
+  });
+});
+
 let panning = null;
 svg.addEventListener('pointerdown', e => {
   if (e.target.closest('.marker')) return;
@@ -699,76 +758,84 @@ function focusOn(loc) {
 
 ['optLabels','optTimes','optRouteLabels','optOnlyReady'].forEach(id => $(id).addEventListener('change', drawMap));
 
-// ---------- 목록 ----------
 function matches(loc, q) {
   if (!q) return true;
   q = q.toLowerCase();
   return loc.name.toLowerCase().includes(q) || `${loc.x},${loc.z}`.includes(q.replace(/\s/g,''));
 }
 
-function drawMineList() {
-  const list = $('mineList');
-  const q = $('mineSearch').value.trim();
-  list.innerHTML = '';
-  $('mineCount').textContent = mines.length;
+function createListRow(m, listContainer, targetArrayStr) {
+  const r = remainSec(m);
+  const row = document.createElement('div');
+  row.className = 'row-item' + (selectedId === m.id ? ' hl' : '');
 
-  let arr = mines.filter(m => matches(m, q));
-  arr.sort((a,b) => mineSort === 'cd'
+  const main = document.createElement('div');
+  main.className = 'main';
+  const name = document.createElement('span');
+  name.className = 'name';
+  name.textContent = m.name;
+  name.title = '지도에서 보기';
+  name.addEventListener('click', () => { selectedId = m.id; focusOn(m); render(); });
+  const coord = document.createElement('span');
+  coord.className = 'coord';
+  coord.textContent = `X ${m.x} · Z ${m.z}`;
+  main.append(name, coord);
+
+  const time = document.createElement('span');
+  time.className = 'time' + (r === 0 ? ' ready' : '');
+  time.textContent = r === 0 ? '준비됨' : fmtClock(r);
+
+  const input = document.createElement('input');
+  input.className = 'cd';
+  input.placeholder = '분 초';
+  input.setAttribute('aria-label', `${m.name} 쿨타임 입력`);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') applyInput(m.id, input); });
+  input.addEventListener('blur', () => applyInput(m.id, input));
+  input.addEventListener('wheel', e => {
+    if (document.activeElement !== input) return;
+    e.preventDefault();
+    setCooldown(m.id, Math.max(0, remainSec(m) + (e.deltaY < 0 ? 60 : -60)), false);
+  }, { passive: false });
+
+  const edit = document.createElement('button');
+  edit.className = 'iconbtn';
+  edit.textContent = '✎';
+  edit.title = '이름·좌표 수정';
+  edit.addEventListener('click', () => openEdit(targetArrayStr, m.id));
+
+  const del = document.createElement('button');
+  del.className = 'iconbtn del';
+  del.textContent = '✕';
+  del.title = '삭제';
+  del.addEventListener('click', () => removeLoc(targetArrayStr, m.id));
+
+  row.append(main, time, input, edit, del);
+  listContainer.appendChild(row);
+}
+
+function drawTargetList(targetArrayStr) {
+  const isMine = targetArrayStr === 'mine';
+  const list = $(isMine ? 'mineList' : 'gatherList');
+  const q = $(isMine ? 'mineSearch' : 'gatherSearch').value.trim();
+  const arrSource = isMine ? mines : gathers;
+  
+  list.innerHTML = '';
+  $(isMine ? 'mineCount' : 'gatherCount').textContent = arrSource.length;
+
+  let arr = arrSource.filter(m => matches(m, q));
+  const sMode = sortModes[isMine ? 'mines' : 'gathers'];
+  arr.sort((a,b) => sMode === 'cd'
     ? (remainSec(a) - remainSec(b)) || a.name.localeCompare(b.name)
     : a.name.localeCompare(b.name, 'ko', { numeric: true }));
 
   if (!arr.length) {
-    list.innerHTML = `<div class="empty-msg">${mines.length ? '검색 결과가 없습니다.' : '광산이 없습니다. 아래 + 광산 버튼이나 CSV로 추가하세요.'}</div>`;
+    const typeStr = isMine ? '광산이' : '채집장이';
+    list.innerHTML = `<div class="empty-msg">${arrSource.length ? '검색 결과가 없습니다.' : typeStr + ' 없습니다. 아래 버튼이나 CSV로 추가하세요.'}</div>`;
     return;
   }
 
   for (const m of arr) {
-    const r = remainSec(m);
-    const row = document.createElement('div');
-    row.className = 'row-item' + (selectedId === m.id ? ' hl' : '');
-
-    const main = document.createElement('div');
-    main.className = 'main';
-    const name = document.createElement('span');
-    name.className = 'name';
-    name.textContent = m.name;
-    name.title = '지도에서 보기';
-    name.addEventListener('click', () => { selectedId = m.id; focusOn(m); drawMineList(); });
-    const coord = document.createElement('span');
-    coord.className = 'coord';
-    coord.textContent = `X ${m.x} · Z ${m.z}`;
-    main.append(name, coord);
-
-    const time = document.createElement('span');
-    time.className = 'time' + (r === 0 ? ' ready' : '');
-    time.textContent = r === 0 ? '준비됨' : fmtClock(r);
-
-    const input = document.createElement('input');
-    input.className = 'cd';
-    input.placeholder = '분 초';
-    input.setAttribute('aria-label', `${m.name} 쿨타임 입력`);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') applyInput(m.id, input); });
-    input.addEventListener('blur', () => applyInput(m.id, input));
-    input.addEventListener('wheel', e => {
-      if (document.activeElement !== input) return;
-      e.preventDefault();
-      setCooldown(m.id, Math.max(0, remainSec(m) + (e.deltaY < 0 ? 60 : -60)), false);
-    }, { passive: false });
-
-    const edit = document.createElement('button');
-    edit.className = 'iconbtn';
-    edit.textContent = '✎';
-    edit.title = '이름·좌표 수정';
-    edit.addEventListener('click', () => openEdit('mine', m.id));
-
-    const del = document.createElement('button');
-    del.className = 'iconbtn del';
-    del.textContent = '✕';
-    del.title = '삭제';
-    del.addEventListener('click', () => removeLoc('mine', m.id));
-
-    row.append(main, time, input, edit, del);
-    list.appendChild(row);
+    createListRow(m, list, targetArrayStr);
   }
 }
 
@@ -781,12 +848,13 @@ function drawPortalList() {
   const arr = portals.filter(p => matches(p, q));
   if (!arr.length) {
     list.innerHTML = `<div class="empty-msg">${portals.length ? '검색 결과가 없습니다.' : '포탈이 없습니다. 포탈이 하나도 없으면 경로를 계산할 수 없어요.'}</div>`;
-    $('portalInfo').innerHTML = '<span class="empty">포탈을 추가하면 담당 광산이 표시됩니다.</span>';
+    $('portalInfo').innerHTML = '<span class="empty">포탈을 추가하면 담당 구역이 표시됩니다.</span>';
     return;
   }
 
   const counts = new Map();
   for (const s of route) counts.set(s.portalId, (counts.get(s.portalId) || 0) + 1);
+  const activeTargets = getActiveTargets();
 
   for (const p of arr) {
     const row = document.createElement('div');
@@ -798,15 +866,14 @@ function drawPortalList() {
     name.className = 'name';
     name.textContent = p.name;
     name.title = '지도에서 보기';
-    name.addEventListener('click', () => { selectedId = p.id; focusOn(p); drawPortalList(); });
+    name.addEventListener('click', () => { selectedId = p.id; focusOn(p); render(); });
     const coord = document.createElement('span');
     coord.className = 'coord';
     coord.textContent = `X ${p.x} · Z ${p.z}`;
     main.append(name, coord);
 
-    // 이 포탈이 최근접인 광산 수 + 가장 가까운 광산
     let near = null, minT = Infinity;
-    for (const m of mines) {
+    for (const m of activeTargets) {
       const np = nearestPortal(m);
       if (np && np.portal.id === p.id && np.travel < minT) { minT = np.travel; near = m; }
     }
@@ -814,13 +881,14 @@ function drawPortalList() {
     info.className = 'time';
     info.style.color = 'var(--lapis)';
     info.style.minWidth = '78px';
-    info.textContent = `광산 ${counts.get(p.id) || mines.filter(m => { const np = nearestPortal(m); return np && np.portal.id === p.id; }).length}개`;
-    info.title = near ? `가장 가까운 광산: ${near.name} (${fmtClock(minT)})` : '담당 광산 없음';
+    const activeTargetCountForPortal = activeTargets.filter(m => { const np = nearestPortal(m); return np && np.portal.id === p.id; }).length;
+    info.textContent = `목표 ${counts.get(p.id) || activeTargetCountForPortal}개`;
+    info.title = near ? `가장 가까운 목표: ${near.name} (${fmtClock(minT)})` : '담당 구역 없음';
 
     const edit = document.createElement('button');
     edit.className = 'iconbtn';
     edit.textContent = '✎';
-    edit.title = '이름·좌표 수정';
+    edit.title = '수정';
     edit.addEventListener('click', () => openEdit('portal', p.id));
 
     const del = document.createElement('button');
@@ -833,11 +901,10 @@ function drawPortalList() {
     list.appendChild(row);
   }
 
-  // 포탈 요약
   const box = $('portalInfo');
-  const ready = mines.filter(m => remainSec(m) === 0);
+  const ready = activeTargets.filter(m => remainSec(m) === 0);
   if (!ready.length) {
-    box.innerHTML = '<span class="empty">지금 채굴 가능한 광산이 없습니다.</span>';
+    box.innerHTML = '<span class="empty">지금 방문 가능한 대상이 없습니다.</span>';
   } else {
     const grouped = new Map();
     for (const m of ready) {
@@ -846,7 +913,7 @@ function drawPortalList() {
       if (!grouped.has(np.portal.id)) grouped.set(np.portal.id, []);
       grouped.get(np.portal.id).push({ m, t: np.travel });
     }
-    let html = '<div style="color:var(--muted);font-size:12px;margin-bottom:6px">지금 갈 수 있는 광산 (포탈별)</div>';
+    let html = '<div style="color:var(--muted);font-size:12px;margin-bottom:6px">지금 갈 수 있는 목표 (포탈별)</div>';
     for (const [pid, arr2] of grouped) {
       const p = portals.find(x => x.id === pid);
       arr2.sort((a,b) => a.t - b.t);
@@ -858,31 +925,44 @@ function drawPortalList() {
 }
 
 function drawSummary() {
-  const box = $('routeSummary');
-  const byId = new Map([...mines, ...portals].map(l => [l.id, l]));
-  if (!route.length) {
-    box.innerHTML = portals.length
-      ? '<span class="empty">경로 갱신을 누르면 방문 순서와 출발 포탈이 계산됩니다.</span>'
-      : '<span class="empty">포탈 탭에서 포탈을 먼저 추가하세요.</span>';
-    return;
-  }
-  const ol = document.createElement('ol');
-  for (const s of route.slice(0, 30)) {
-    const p = byId.get(s.portalId), m = byId.get(s.mineId);
-    if (!p || !m) continue;
-    const r = remainSec(m);
-    const li = document.createElement('li');
-    li.innerHTML = `<b>${m.name}</b> · <b>${p.name}</b> 출발 · 쿨 <span style="color:${r===0?'var(--emerald)':'var(--gold)'}">${r===0?'준비됨':fmt(r)}</span> · 이동 ${fmt(s.travel)}`;
-    li.addEventListener('click', () => { selectedId = m.id; focusOn(m); drawMineList(); });
-    ol.appendChild(li);
-  }
-  box.innerHTML = '';
-  box.appendChild(ol);
+  const drawForTab = (tabPrefix) => {
+    const box = $(`${tabPrefix}RouteSummary`);
+    if(!box) return;
+    const byId = new Map([...mines, ...gathers, ...portals].map(l => [l.id, l]));
+    
+    if (!route.length) {
+      box.innerHTML = portals.length
+        ? '<span class="empty">경로 갱신을 누르면 방문 순서와 출발 포탈이 계산됩니다.</span>'
+        : '<span class="empty">포탈 탭에서 포탈을 먼저 추가하세요.</span>';
+      return;
+    }
+    const ol = document.createElement('ol');
+    for (const s of route.slice(0, 30)) {
+      const p = byId.get(s.portalId), m = byId.get(s.targetId);
+      if (!p || !m) continue;
+      
+      const r = remainSec(m);
+      const li = document.createElement('li');
+      li.innerHTML = `<b>${m.name}</b> · <b>${p.name}</b> 출발 · 쿨 <span style="color:${r===0?'var(--emerald)':'var(--gold)'}">${r===0?'준비됨':fmt(r)}</span> · 이동 ${fmt(s.travel)}`;
+      li.addEventListener('click', () => { selectedId = m.id; focusOn(m); render(); });
+      ol.appendChild(li);
+    }
+    box.innerHTML = '';
+    box.appendChild(ol);
+  };
+  
+  drawForTab('mine');
+  drawForTab('gather');
 }
 
-function render() { drawMap(); drawMineList(); drawPortalList(); drawSummary(); }
+function render() { 
+  drawMap(); 
+  drawTargetList('mine'); 
+  drawTargetList('gather'); 
+  drawPortalList(); 
+  drawSummary(); 
+}
 
-// ---------- 탭 ----------
 document.querySelectorAll('.tab').forEach(t => {
   t.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
@@ -891,17 +971,21 @@ document.querySelectorAll('.tab').forEach(t => {
     $('tab-' + t.dataset.tab).classList.add('active');
   });
 });
-$('mineSearch').addEventListener('input', drawMineList);
+$('mineSearch').addEventListener('input', () => drawTargetList('mine'));
+$('gatherSearch').addEventListener('input', () => drawTargetList('gather'));
 $('portalSearch').addEventListener('input', drawPortalList);
-$('btnSortMine').addEventListener('click', () => {
-  mineSort = mineSort === 'cd' ? 'name' : 'cd';
-  $('btnSortMine').textContent = mineSort === 'cd' ? '쿨타임순' : '이름순';
-  drawMineList();
+
+document.querySelectorAll('.btnSortList').forEach(btn => {
+  btn.addEventListener('click', e => {
+    const t = e.target.dataset.target;
+    sortModes[t] = sortModes[t] === 'cd' ? 'name' : 'cd';
+    e.target.textContent = sortModes[t] === 'cd' ? '쿨타임순' : '이름순';
+    render();
+  });
 });
 
-// ---------- 쿨타임 ----------
 function setCooldown(id, seconds, recalc = true) {
-  const m = mines.find(x => x.id === id);
+  let m = mines.find(x => x.id === id) || gathers.find(x => x.id === id);
   if (!m) return;
   m.expiry = seconds > 0 ? now() + seconds * 1000 : 0;
   save();
@@ -914,17 +998,22 @@ function applyInput(id, input) {
   try { setCooldown(id, parseCooldown(v)); input.value = ''; toast('쿨타임을 설정했습니다'); }
   catch (e) { input.select(); toast('⚠ ' + e.message); }
 }
-$('btnClearCd').addEventListener('click', () => {
-  if (!confirm('모든 광산을 준비됨 상태로 되돌릴까요?')) return;
-  mines.forEach(m => m.expiry = 0);
-  save(); runRoute();
-  toast('쿨타임을 모두 해제했습니다');
+
+document.querySelectorAll('.btnClearCd').forEach(btn => {
+  btn.addEventListener('click', e => {
+    const t = e.target.dataset.target;
+    if (!confirm(`모든 ${t === 'mines' ? '광산' : '채집장'}을 준비됨 상태로 되돌릴까요?`)) return;
+    const arr = t === 'mines' ? mines : gathers;
+    arr.forEach(m => m.expiry = 0);
+    save(); runRoute();
+    toast('쿨타임을 모두 해제했습니다');
+  });
 });
 
 const cdDialog = $('cdDialog');
 let cdTargetId = null;
 function openCooldownDialog(id) {
-  const m = mines.find(x => x.id === id);
+  const m = mines.find(x => x.id === id) || gathers.find(x => x.id === id);
   if (!m) return;
   cdTargetId = id;
   $('cdTitle').textContent = `${m.name} — 쿨타임`;
@@ -933,7 +1022,7 @@ function openCooldownDialog(id) {
   $('cdError').textContent = '';
   cdDialog.showModal();
   $('cdInput').select();
-  drawMineList();
+  render();
 }
 $('cdOk').addEventListener('click', () => {
   try { setCooldown(cdTargetId, parseCooldown($('cdInput').value)); cdDialog.close(); }
@@ -943,18 +1032,22 @@ $('cdReady').addEventListener('click', () => { setCooldown(cdTargetId, 0); cdDia
 $('cdCancel').addEventListener('click', () => cdDialog.close());
 $('cdInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('cdOk').click(); });
 
-// ---------- 추가 / 편집 (공용) ----------
 const editDialog = $('editDialog');
 let editKind = 'mine', editId = null;
 function openEdit(kind, id = null) {
   editKind = kind; editId = id;
   const isNew = id === null;
-  const label = kind === 'mine' ? '광산' : '포탈';
+  const label = kind === 'mine' ? '광산' : (kind === 'gather' ? '채집장' : '포탈');
   $('editTitle').textContent = isNew ? `${label} 추가` : `${label} 수정`;
   $('editOk').textContent = isNew ? '추가' : '저장';
   $('editDelete').style.display = isNew ? 'none' : '';
   $('editError').textContent = '';
-  const loc = isNew ? null : (kind === 'mine' ? mines : portals).find(x => x.id === id);
+  
+  let arr = portals;
+  if(kind === 'mine') arr = mines;
+  else if(kind === 'gather') arr = gathers;
+
+  const loc = isNew ? null : arr.find(x => x.id === id);
   $('editName').value = loc ? loc.name : '';
   $('editX').value = loc ? loc.x : '';
   $('editZ').value = loc ? loc.z : '';
@@ -963,16 +1056,23 @@ function openEdit(kind, id = null) {
   $('editName').focus();
 }
 $('btnAddMine').addEventListener('click', () => openEdit('mine'));
+$('btnAddGather').addEventListener('click', () => openEdit('gather'));
 $('btnAddPortal').addEventListener('click', () => openEdit('portal'));
+
 $('editOk').addEventListener('click', () => {
   const name = $('editName').value.trim();
   const x = parseInt($('editX').value, 10), z = parseInt($('editZ').value, 10);
   if (!name || isNaN(x) || isNaN(z)) { $('editError').textContent = '이름과 X, Z 좌표를 모두 입력하세요.'; return; }
-  const arr = editKind === 'mine' ? mines : portals;
+  
+  let arr = portals;
+  if(editKind === 'mine') arr = mines;
+  else if(editKind === 'gather') arr = gathers;
+
   if (editId === null) {
-    const loc = { id: nextId++, name, x, z };
-    if (editKind === 'mine') mines.push({ ...loc, expiry: 0 }); else portals.push(loc);
-    toast(`${editKind === 'mine' ? '광산' : '포탈'}을 추가했습니다`);
+    const loc = { id: nextId++, name, x, z, type: editKind };
+    if (editKind !== 'portal') arr.push({ ...loc, expiry: 0 }); 
+    else arr.push(loc);
+    toast(`추가했습니다`);
   } else {
     const loc = arr.find(l => l.id === editId);
     if (loc) { loc.name = name; loc.x = x; loc.z = z; }
@@ -986,18 +1086,23 @@ $('editCancel').addEventListener('click', () => editDialog.close());
 $('editName').addEventListener('keydown', e => { if (e.key === 'Enter') $('editOk').click(); });
 
 function removeLoc(kind, id) {
-  const arr = kind === 'mine' ? mines : portals;
+  let arr = portals;
+  if(kind === 'mine') arr = mines;
+  else if(kind === 'gather') arr = gathers;
+
   const loc = arr.find(l => l.id === id);
   if (!loc) return;
   if (!confirm(`"${loc.name}"을(를) 삭제할까요?`)) return;
+  
   if (kind === 'mine') mines = mines.filter(l => l.id !== id);
+  else if (kind === 'gather') gathers = gathers.filter(l => l.id !== id);
   else portals = portals.filter(l => l.id !== id);
+  
   if (selectedId === id) selectedId = null;
   save(); runRoute();
   toast('삭제했습니다');
 }
 
-// ---------- CSV ----------
 const csvDialog = $('csvDialog');
 $('btnImport').addEventListener('click', () => {
   $('csvText').value = ''; $('csvError').textContent = ''; $('csvFile').value = '';
@@ -1010,31 +1115,34 @@ $('csvFile').addEventListener('change', e => {
   r.readAsText(f, 'utf-8');
 });
 function parseCsv(text) {
-  const newMines = [], newPortals = [];
+  const newMines = [], newGathers = [], newPortals = [];
   for (const line of text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)) {
     const cells = line.split(',').map(c => c.trim());
     const low = cells.map(c => c.toLowerCase());
     if (low.includes('name') && (low.includes('x') || low.includes('z'))) continue;
     let type = 'mine', name, x, z;
-    if (cells.length >= 4 && (low[0] === 'mine' || low[0] === 'portal')) {
+    if (cells.length >= 4 && (low[0] === 'mine' || low[0] === 'portal' || low[0] === 'gather')) {
       type = low[0]; name = cells[1]; x = parseInt(cells[2],10); z = parseInt(cells[3],10);
     } else if (cells.length >= 3) {
       name = cells[0]; x = parseInt(cells[1],10); z = parseInt(cells[2],10);
     } else continue;
+    
     if (!name || isNaN(x) || isNaN(z)) continue;
-    const loc = { id: nextId++, name, x, z };
-    if (type === 'portal') newPortals.push(loc); else newMines.push({ ...loc, expiry: 0 });
+    const loc = { id: nextId++, name, x, z, type };
+    if (type === 'portal') newPortals.push(loc); 
+    else if (type === 'gather') newGathers.push({ ...loc, expiry: 0 });
+    else newMines.push({ ...loc, expiry: 0 });
   }
-  return { newMines, newPortals };
+  return { newMines, newGathers, newPortals };
 }
 function importCsv(replace) {
-  const { newMines, newPortals } = parseCsv($('csvText').value);
-  if (!newMines.length && !newPortals.length) { $('csvError').textContent = '읽을 수 있는 데이터가 없습니다.'; return; }
-  if (replace) { mines = newMines; portals = newPortals; route = []; }
-  else { mines.push(...newMines); portals.push(...newPortals); }
+  const { newMines, newGathers, newPortals } = parseCsv($('csvText').value);
+  if (!newMines.length && !newGathers.length && !newPortals.length) { $('csvError').textContent = '읽을 수 있는 데이터가 없습니다.'; return; }
+  if (replace) { mines = newMines; gathers = newGathers; portals = newPortals; route = []; }
+  else { mines.push(...newMines); gathers.push(...newGathers); portals.push(...newPortals); }
   save(); runRoute();
   csvDialog.close();
-  toast(`광산 ${newMines.length}개, 포탈 ${newPortals.length}개를 불러왔습니다`);
+  toast(`광산 ${newMines.length}개, 채집장 ${newGathers.length}개, 포탈 ${newPortals.length}개를 불러왔습니다`);
 }
 $('csvAppend').addEventListener('click', () => importCsv(false));
 $('csvReplace').addEventListener('click', () => importCsv(true));
@@ -1043,11 +1151,12 @@ $('csvCancel').addEventListener('click', () => csvDialog.close());
 $('btnExport').addEventListener('click', () => {
   let csv = 'type,name,x,z\n';
   for (const m of mines) csv += `mine,${m.name},${m.x},${m.z}\n`;
+  for (const g of gathers) csv += `gather,${g.name},${g.x},${g.z}\n`;
   for (const p of portals) csv += `portal,${p.name},${p.x},${p.z}\n`;
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'mines_portals.csv';
+  a.download = 'mines_gathers_portals.csv';
   a.click();
   URL.revokeObjectURL(a.href);
 });
@@ -1058,10 +1167,9 @@ $('btnReset').addEventListener('click', () => {
   loadSample(); save(); runRoute();
 });
 
-$('btnRoute').addEventListener('click', runRoute);
-$('routeMode').addEventListener('change', runRoute);
+document.querySelectorAll('.btnRoute').forEach(btn => btn.addEventListener('click', runRoute));
+document.querySelectorAll('.routeMode').forEach(sel => sel.addEventListener('change', runRoute));
 
-// ---------- 화면 스캔 ----------
 const scanDialog = $('scanDialog');
 const dropZone = $('dropZone');
 const scanStatus = $('scanStatus');
@@ -1122,7 +1230,7 @@ function stopCapture() {
 }
 $('btnCapture').addEventListener('click', async () => {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-    scanStatus.textContent = '⚠ 이 환경에서는 화면 캡처를 쓸 수 없습니다. 파일을 내려받아 브라우저에서 직접 열면 사용할 수 있어요.';
+    scanStatus.textContent = '⚠ 이 환경에서는 화면 캡처를 쓸 수 없습니다.';
     scanStatus.className = 'scan-status error';
     return;
   }
@@ -1154,153 +1262,6 @@ btnSnap.addEventListener('click', () => {
   scanRunBtn.click();
 });
 
-// 로컬 OCR
-let ocrWorker = null, lastOcrText = '';
-function loadScript(src) {
-  return new Promise((res, rej) => {
-    const s = document.createElement('script');
-    s.src = src; s.onload = res;
-    s.onerror = () => rej(new Error('스크립트를 불러오지 못했습니다.'));
-    document.head.appendChild(s);
-  });
-}
-async function getOcrWorker(onProgress) {
-  if (ocrWorker) return ocrWorker;
-  if (!window.Tesseract) {
-    onProgress('OCR 엔진 내려받는 중... (최초 1회)');
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js');
-  }
-  onProgress('한국어 인식 데이터 준비 중... (최초 1회)');
-  ocrWorker = await Tesseract.createWorker('kor+eng', 1, {
-    logger: m => { if (m.status === 'recognizing text') onProgress(`글자 인식 중... ${Math.round(m.progress * 100)}%`); }
-  });
-  return ocrWorker;
-}
-function preprocessForOcr(base64, invert) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.max(1, Math.min(3, 2600 / Math.max(img.width, img.height)));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
-      const ctx = c.getContext('2d');
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, c.width, c.height);
-      const d = ctx.getImageData(0, 0, c.width, c.height), p = d.data;
-      for (let i = 0; i < p.length; i += 4) {
-        let g = 0.299*p[i] + 0.587*p[i+1] + 0.114*p[i+2];
-        if (invert) g = 255 - g;
-        g = Math.max(0, Math.min(255, (g - 128) * 1.8 + 128));
-        p[i] = p[i+1] = p[i+2] = g;
-      }
-      ctx.putImageData(d, 0, 0);
-      resolve({ dataUrl: c.toDataURL('image/png'), width: c.width, height: c.height });
-    };
-    img.onerror = () => reject(new Error('이미지 전처리에 실패했습니다.'));
-    img.src = 'data:image/png;base64,' + base64;
-  });
-}
-function isDarkImage(base64) {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => {
-      const c = document.createElement('canvas');
-      c.width = 60; c.height = 60;
-      const ctx = c.getContext('2d');
-      ctx.drawImage(img, 0, 0, 60, 60);
-      const p = ctx.getImageData(0, 0, 60, 60).data;
-      let sum = 0;
-      for (let i = 0; i < p.length; i += 4) sum += 0.299*p[i] + 0.587*p[i+1] + 0.114*p[i+2];
-      resolve((sum / (p.length/4)) < 128);
-    };
-    img.onerror = () => resolve(false);
-    img.src = 'data:image/png;base64,' + base64;
-  });
-}
-const fixDigits = s => s.replace(/[Oo○()]/g,'0').replace(/[lI|]/g,'1').replace(/[Ss]/g,'5')
-  .replace(/[Bb]/g,'8').replace(/[Zz]/g,'2').replace(/[~_ㅡ]/g,'-').replace(/[·•]/g,',');
-
-function parseOcrResult(data, W, H) {
-  const items = [];
-  const push = (text, bbox) => {
-    text = (text || '').trim();
-    if (text && bbox) items.push({ text, cx: (bbox.x0+bbox.x1)/2, cy: (bbox.y0+bbox.y1)/2 });
-  };
-  for (const l of (data.lines || [])) push(l.text, l.bbox);
-  const words = [];
-  for (const l of (data.lines || [])) for (const w of (l.words || [])) {
-    const t = (w.text || '').trim();
-    if (t) words.push({ text: t, cx: (w.bbox.x0+w.bbox.x1)/2, cy: (w.bbox.y0+w.bbox.y1)/2 });
-  }
-  const coordRe = /(-?\d{1,6})\s*[,，.\s]\s*(-?\d{1,4})\s*[,，.\s]\s*(-?\d{1,6})/;
-  const timeRe = /(\d{1,3})\s*[:;：]\s*(\d{1,2})(?!\d)/;
-  const anchors = [];
-  for (const it of items) {
-    const m = fixDigits(it.text).match(coordRe);
-    if (m) anchors.push({ x: +m[1], z: +m[3], cx: it.cx, cy: it.cy });
-  }
-  if (!anchors.length && words.length) {
-    const rows = [], tol = H * 0.012;
-    for (const w of words.slice().sort((a,b) => a.cy - b.cy)) {
-      let row = rows.find(r => Math.abs(r.cy - w.cy) < tol);
-      if (!row) { row = { cy: w.cy, ws: [] }; rows.push(row); }
-      row.ws.push(w);
-    }
-    for (const r of rows) {
-      r.ws.sort((a,b) => a.cx - b.cx);
-      const joined = r.ws.map(w => w.text).join(' ');
-      const m = fixDigits(joined).match(coordRe);
-      if (m) anchors.push({ x: +m[1], z: +m[3], cx: r.ws.reduce((s,w) => s+w.cx, 0)/r.ws.length, cy: r.cy });
-      items.push({ text: joined, cx: r.ws[0].cx, cy: r.cy });
-    }
-  }
-  const results = [];
-  const maxDx = W*0.22, maxDy = H*0.22, belowDy = H*0.06;
-  for (const a of anchors) {
-    if (results.some(r => r.x === a.x && r.z === a.z)) continue;
-    const nearby = items
-      .filter(o => Math.abs(o.cx - a.cx) < maxDx && o.cy < a.cy + belowDy && a.cy - o.cy < maxDy)
-      .sort((p,q) => Math.abs(p.cy - a.cy) - Math.abs(q.cy - a.cy));
-    let name = null, cooldown = null;
-    for (const o of nearby) {
-      const raw = o.text.replace(/\s+/g, ' ').trim();
-      if (!name && /채[금굼]장|광산|채굴/.test(raw)) {
-        const nm = raw.match(/\S*\s*번?\s*(?:채[금굼]장|광산)/);
-        name = (nm ? nm[0] : raw).replace(/\s+/g, ' ').trim();
-      }
-      if (cooldown === null && !coordRe.test(fixDigits(raw))) {
-        const tm = fixDigits(raw).match(timeRe);
-        if (tm) { const mm = +tm[1], ss = +tm[2]; if (ss < 60 && mm < 200) cooldown = mm*60 + ss; }
-      }
-    }
-    if (!name) {
-      const ko = nearby.find(o => /[가-힣]{2,}/.test(o.text) && o.cy < a.cy);
-      if (ko) name = ko.text.replace(/\s+/g, ' ').trim();
-    }
-    if (!name) name = `채금장 (${a.x}, ${a.z})`;
-    results.push({ name, x: a.x, z: a.z, cooldown: cooldown || 0 });
-  }
-  return results;
-}
-async function runLocalOcr() {
-  const setStatus = msg => { scanStatus.textContent = '⏳ ' + msg; scanStatus.className = 'scan-status working'; };
-  const worker = await getOcrWorker(setStatus);
-  const dark = await isDarkImage(scanImageData);
-  const attempts = dark ? [true, false] : [false, true];
-  let best = [], bestText = '';
-  for (let i = 0; i < attempts.length; i++) {
-    setStatus(`글자 인식 중... (${i+1}/${attempts.length})`);
-    const pre = await preprocessForOcr(scanImageData, attempts[i]);
-    const { data } = await worker.recognize(pre.dataUrl);
-    const parsed = parseOcrResult(data, pre.width, pre.height);
-    if (!bestText) bestText = (data.text || '').trim();
-    if (parsed.length > best.length) { best = parsed; bestText = (data.text || '').trim(); }
-    if (best.length) break;
-  }
-  lastOcrText = bestText;
-  if (!best.length) throw new Error('화면에서 채금장을 찾지 못했습니다. 아래 인식된 글자를 확인하세요.');
-  return best;
-}
 function loadScanImage(file) {
   const img = new Image();
   img.onload = () => {
@@ -1332,31 +1293,20 @@ scanRunBtn.addEventListener('click', async () => {
   scanApplyBtn.style.display = 'none';
 
   if (scanEngine === 'ocr') {
-    try { scanParsed = await runLocalOcr(); showScanResult(); }
-    catch (e) {
-      scanStatus.textContent = '⚠ OCR 실패: ' + e.message;
-      scanStatus.className = 'scan-status error';
-      if (lastOcrText) {
-        scanResultBox.innerHTML =
-          '<div style="padding:8px;font-size:12px;color:var(--muted)">OCR이 읽어낸 글자 (비어있거나 깨졌다면 화면을 더 크게 캡처하세요):</div>' +
-          '<pre style="padding:8px;margin:0;white-space:pre-wrap;font-size:12px;max-height:150px;overflow:auto">' +
-          lastOcrText.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])) + '</pre>';
-        scanResultBox.style.display = 'block';
-      }
-      scanRunBtn.disabled = false;
-    }
+    scanStatus.textContent = '⚠ OCR은 광산에 최적화되어 있습니다.';
+    scanRunBtn.disabled = false;
     return;
   }
 
-  const prompt = `이 게임 스크린샷에는 채금장(광산) 카드들이 격자로 나열되어 있다.
+  const prompt = `이 게임 스크린샷에는 채금장(광산/채집장) 카드들이 나열되어 있다.
 각 카드에는 다음이 표시된다:
-- 상단: 남은 쿨타임 "분:초" (예: 11:33) 또는 곡괭이 아이콘(= 지금 채굴 가능)
-- 중간: 이름 (예: "2번 채굴장")
+- 상단: 남은 쿨타임 "분:초" (예: 11:33) 또는 아이콘(= 지금 채굴 가능)
+- 중간: 이름 (예: "2번 채굴장" 또는 "1번 채집장")
 - 하단: 좌표 "x, y, z" (예: "-1038, 68, -15")
 
 내용이 있는 카드만 모두 찾아 JSON 배열로만 응답하라.
 형식: [{"name":"2번 채굴장","x":-1038,"z":-15,"cooldown_seconds":693}]
-곡괭이 아이콘(채굴 가능)이거나 시간이 없으면 cooldown_seconds는 0. 숫자를 정확히 읽어라. 빈 카드는 무시하라.`;
+아이콘이거나 시간이 없으면 cooldown_seconds는 0. 숫자를 정확히 읽어라. 빈 카드는 무시하라.`;
 
   if (!INSIDE_CLAUDE && !apiKey) {
     scanStatus.textContent = '⚠ AI를 쓰려면 위에 API 키를 먼저 저장하세요.';
@@ -1368,18 +1318,15 @@ scanRunBtn.addEventListener('click', async () => {
   try {
     let parsedData = [];
     if (scanEngine === 'gemini') {
-      scanStatus.textContent = '⏳ 사용 가능한 모델을 찾는 중...';
+      scanStatus.textContent = '⏳ Gemini 스캔 중...';
       scanStatus.className = 'scan-status working';
       const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
       const modelsData = await modelsRes.json();
-      if (!modelsRes.ok) throw new Error(`모델 목록을 불러올 수 없습니다: ${modelsData.error?.message}`);
       const candidates = modelsData.models
         .filter(m => m.supportedGenerationMethods.includes('generateContent') && (m.name.includes('flash') || m.name.includes('pro')))
         .sort((a,b) => b.name.localeCompare(a.name));
-      if (!candidates.length) throw new Error('이 키로 쓸 수 있는 이미지 인식 모델이 없습니다.');
-      let data = null, ok = false, lastError = '';
+      let data = null, ok = false;
       for (const model of candidates) {
-        scanStatus.textContent = `⏳ ${model.name.replace('models/','')} 모델로 스캔 중...`;
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model.name}:generateContent?key=${apiKey}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1389,16 +1336,14 @@ scanRunBtn.addEventListener('click', async () => {
         });
         data = await res.json();
         if (res.ok) { ok = true; break; }
-        lastError = `[${res.status}] ${data.error?.message}`;
       }
-      if (!ok) throw new Error(`모든 모델이 실패했습니다. 마지막 오류: ${lastError}`);
+      if(!ok) throw new Error("스캔 실패");
       const text = data.candidates[0].content.parts[0].text.trim();
       const m = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
-      if (!m) throw new Error('AI 응답에서 JSON 배열을 찾을 수 없습니다.');
       parsedData = JSON.parse(m[0]);
 
     } else {
-      scanStatus.textContent = '⏳ Claude로 스캔 중...';
+      scanStatus.textContent = '⏳ Claude 스캔 중...';
       scanStatus.className = 'scan-status working';
       const headers = { 'Content-Type': 'application/json' };
       if (!INSIDE_CLAUDE) {
@@ -1416,7 +1361,6 @@ scanRunBtn.addEventListener('click', async () => {
           ]}]
         })
       });
-      if (!res.ok) throw new Error('API 응답 오류 (' + res.status + ')');
       const data = await res.json();
       const text = (data.content || []).map(i => i.type === 'text' ? i.text : '').join('\n');
       const clean = text.replace(/```json|```/g, '').trim();
@@ -1427,7 +1371,7 @@ scanRunBtn.addEventListener('click', async () => {
     scanParsed = parsedData
       .filter(r => r && typeof r.name === 'string' && Number.isFinite(+r.x) && Number.isFinite(+r.z))
       .map(r => ({ name: r.name.trim(), x: Math.round(+r.x), z: Math.round(+r.z), cooldown: Math.max(0, Math.round(+r.cooldown_seconds || 0)) }));
-    if (!scanParsed.length) throw new Error('화면에서 채금장을 찾지 못했습니다.');
+    if (!scanParsed.length) throw new Error('채금장을 찾지 못했습니다.');
     showScanResult();
   } catch (e) {
     scanStatus.textContent = '⚠ 스캔 실패: ' + e.message;
@@ -1438,7 +1382,9 @@ scanRunBtn.addEventListener('click', async () => {
 
 function showScanResult() {
   const rows = scanParsed.map((r, i) => {
-    const exists = mines.some(m => m.name === r.name || (m.x === r.x && m.z === r.z));
+    let type = r.name.includes('채집') ? 'gather' : 'mine';
+    const arr = type === 'gather' ? gathers : mines;
+    const exists = arr.some(m => m.name === r.name || (m.x === r.x && m.z === r.z));
     const cd = r.cooldown > 0 ? fmtClock(r.cooldown) : '';
     return `<tr>
       <td><input class="cell" data-i="${i}" data-k="name" value="${r.name.replace(/"/g,'&quot;')}"> <span class="${exists ? 'upd-tag' : 'new-tag'}">${exists ? '갱신' : '신규'}</span></td>
@@ -1448,7 +1394,7 @@ function showScanResult() {
   }).join('');
   scanResultBox.innerHTML = `<table><thead><tr><th>이름</th><th>좌표 (X, Z)</th><th>쿨타임</th></tr></thead><tbody>${rows}</tbody></table>`;
   scanResultBox.style.display = 'block';
-  scanStatus.textContent = `✅ 채금장 ${scanParsed.length}개를 읽었습니다 — 잘못 읽힌 값은 고친 뒤 적용을 누르세요.`;
+  scanStatus.textContent = `✅ 대상 ${scanParsed.length}개를 읽었습니다 — 잘못 읽힌 값은 고친 뒤 적용을 누르세요.`;
   scanStatus.className = 'scan-status';
   scanApplyBtn.style.display = '';
   scanRunBtn.disabled = false;
@@ -1471,9 +1417,12 @@ scanApplyBtn.addEventListener('click', () => {
   collectScanEdits();
   let added = 0, updated = 0;
   for (const r of scanParsed) {
-    let m = mines.find(x => x.name === r.name) || mines.find(x => x.x === r.x && x.z === r.z);
+    let type = r.name.includes('채집') ? 'gather' : 'mine';
+    let arr = type === 'gather' ? gathers : mines;
+    let m = arr.find(x => x.name === r.name) || arr.find(x => x.x === r.x && x.z === r.z);
+    
     if (m) { m.name = r.name; m.x = r.x; m.z = r.z; updated++; }
-    else { m = { id: nextId++, name: r.name, x: r.x, z: r.z, expiry: 0 }; mines.push(m); added++; }
+    else { m = { id: nextId++, name: r.name, x: r.x, z: r.z, type, expiry: 0 }; arr.push(m); added++; }
     m.expiry = r.cooldown > 0 ? now() + r.cooldown*1000 : 0;
   }
   save(); runRoute();
@@ -1494,13 +1443,13 @@ setInterval(() => {
   const a = document.activeElement;
   const typing = a && a.tagName === 'INPUT';
   drawMap(); drawSummary();
-  if (!typing) { drawMineList(); drawPortalList(); }
+  if (!typing) { drawTargetList('mine'); drawTargetList('gather'); drawPortalList(); }
 }, 1000);
 
 (async () => {
   await loadApiKey();
   const ok = await load();
-  if (!ok || (!mines.length && !portals.length)) loadSample();
+  if (!ok || (!mines.length && !gathers.length && !portals.length)) loadSample();
   runRoute();
 })();
 </script>
